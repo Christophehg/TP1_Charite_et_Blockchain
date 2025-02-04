@@ -2,10 +2,17 @@ import {readFile, writeFile} from 'node:fs/promises'
 import {getDate, monSecret} from "./divers.js";
 import {NotFoundError} from "./errors.js";
 import {createHash} from 'node:crypto'
-
+import fs from 'fs/promises';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 /* Chemin de stockage des blocks */
-const path = ''
+const pathBlockchain = path.join('../src/data/blockchain.json');
+
+function calculateHash(data) {
+    return createHash('sha256').update(data).digest('hex');
+}
+
 
 /**
  * Mes définitions
@@ -23,7 +30,13 @@ const path = ''
  * @return {Promise<any>}
  */
 export async function findBlocks() {
-    // A coder
+    try {
+        const data = await fs.readFile(pathBlockchain, 'utf-8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error("Erreur lors de la lecture du fichier blockchain.json", error);
+        throw new Error("Impossible de lire la blockchain");
+    }
 }
 
 /**
@@ -40,7 +53,14 @@ export async function findBlock(partialBlock) {
  * @return {Promise<Block|null>}
  */
 export async function findLastBlock() {
-    // A coder
+    try {
+        const blocks = await findBlocks();
+
+        return blocks.length > 0 ? blocks[blocks.length - 1] : null;
+    } catch (error) {
+        console.error("Erreur lors de la récupération du dernier bloc :", error);
+        throw error;
+    }
 }
 
 /**
@@ -48,7 +68,24 @@ export async function findLastBlock() {
  * @param contenu
  * @return {Promise<Block[]>}
  */
-export async function createBlock(contenu) {
-    // A coder
-}
+export async function createBlock(name, donation) {
+    try {
+        const blocks = await findBlocks();
+        const lastBlock = await findLastBlock();
+        const newBlock = {
+            id: uuidv4(),
+            name,
+            donation,
+            date: new Date().toISOString(),
+            previousHash: lastBlock ? calculateHash(JSON.stringify(lastBlock)) : null,
+        };
+        newBlock.hash = calculateHash(JSON.stringify(newBlock));
+        blocks.push(newBlock);
+        await fs.writeFile(pathBlockchain, JSON.stringify(blocks, null, 2));
 
+        return newBlock;
+    } catch (error) {
+        console.error("Erreur lors de la création du bloc :", error);
+        throw error;
+    }
+}
